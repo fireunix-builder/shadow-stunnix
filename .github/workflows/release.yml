@@ -521,13 +521,16 @@ jobs:
         run: |
           set -euo pipefail
           assets=(dist/*.tar.gz dist/*.zip dist/SHA256SUMS)
-          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${assets[@]}" \
+              --clobber \
+              --repo "${GITHUB_REPOSITORY}"
             exit 0
           fi
 
           gh release create "${RELEASE_TAG}" \
             "${assets[@]}" \
+            --repo "${GITHUB_REPOSITORY}" \
             --target "${GITHUB_SHA}" \
             --title "STunnix ${RELEASE_TAG}" \
             --notes "Multi-platform binaries built from the configured private source ref."
