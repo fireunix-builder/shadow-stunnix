@@ -469,7 +469,7 @@ jobs:
             --include "*.tar.gz" \
             --include "*.zip" \
             --include "SHA256SUMS" \
-            --cache-control "public,max-age=31536000,immutable" \
+            --cache-control "public,max-age=0,must-revalidate" \
             --only-show-errors
 
           files_json="$(
