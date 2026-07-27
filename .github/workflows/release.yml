@@ -50,6 +50,7 @@ jobs:
         shell: bash
         env:
           RELEASE_TAG: ${{ inputs.version }}
+          SOURCE_REPO_PAT: ${{ secrets.SOURCE_REPO_PAT }}
         run: |
           set -euo pipefail
           if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
@@ -59,6 +60,18 @@ jobs:
           cargo_version="$(awk -F '"' '/^version = "/ { print $2; exit }' source/Cargo.toml)"
           if [[ "${RELEASE_TAG#v}" != "${cargo_version}" ]]; then
             echo "release version does not match Cargo.toml ${cargo_version}" >&2
+            exit 1
+          fi
+          source_sha="$(git -C source rev-parse HEAD)"
+          tag_object="$(GH_TOKEN="${SOURCE_REPO_PAT}" gh api \
+            "repos/fireunix-app/shadow-stunnix/git/ref/tags/${RELEASE_TAG}")"
+          tag_sha="$(jq -r '.object.sha' <<<"${tag_object}")"
+          if [[ "$(jq -r '.object.type' <<<"${tag_object}")" == "tag" ]]; then
+            tag_sha="$(GH_TOKEN="${SOURCE_REPO_PAT}" gh api \
+              "repos/fireunix-app/shadow-stunnix/git/tags/${tag_sha}" --jq '.object.sha')"
+          fi
+          if [[ "${source_sha}" != "${tag_sha}" ]]; then
+            echo "::error::Release tag does not match the private source revision."
             exit 1
           fi
           echo "number=${cargo_version}" >> "${GITHUB_OUTPUT}"
