@@ -1,0 +1,447 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: "Private source branch, tag, or commit"
+        required: true
+        default: "main"
+        type: string
+      version:
+        description: "Release version, for example v0.1.1"
+        required: true
+        type: string
+      publish:
+        description: "Publish a GitHub Release"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.version }}
+  cancel-in-progress: false
+
+env:
+  CARGO_HOME: ${{ github.workspace }}/.cargo-home
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  prepare:
+    name: Validate source and version
+    runs-on: ubuntu-24.04
+    outputs:
+      number: ${{ steps.version.outputs.number }}
+    steps:
+      - name: Check out private source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: fireunix-app/shadow-stunnix
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.SOURCE_REPO_PAT }}
+          persist-credentials: false
+          path: source
+
+      - name: Validate release version
+        id: version
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "invalid release version: ${RELEASE_TAG}" >&2
+            exit 1
+          fi
+          cargo_version="$(awk -F '"' '/^version = "/ { print $2; exit }' source/Cargo.toml)"
+          if [[ "${RELEASE_TAG#v}" != "${cargo_version}" ]]; then
+            echo "release version does not match Cargo.toml ${cargo_version}" >&2
+            exit 1
+          fi
+          echo "number=${cargo_version}" >> "${GITHUB_OUTPUT}"
+          rm -rf source
+
+  test:
+    name: Test
+    needs: prepare
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          components: rustfmt
+
+      - name: Check out private source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: fireunix-app/shadow-stunnix
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.SOURCE_REPO_PAT }}
+          persist-credentials: false
+          path: source
+
+      - name: Test private source
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --check
+          cargo test --locked
+
+      - name: Remove private source
+        if: always()
+        shell: bash
+        run: rm -rf source
+
+  build-portable:
+    name: Build ${{ matrix.platform }} ${{ matrix.release_target }}
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux
+            rust_target: x86_64-unknown-linux-gnu
+            build_target: x86_64-unknown-linux-gnu.2.17
+            release_target: amd64
+            zig: true
+          - runner: ubuntu-24.04
+            platform: linux
+            rust_target: aarch64-unknown-linux-gnu
+            build_target: aarch64-unknown-linux-gnu.2.17
+            release_target: arm64
+            zig: true
+          - runner: ubuntu-24.04
+            platform: linux
+            rust_target: armv7-unknown-linux-gnueabihf
+            build_target: armv7-unknown-linux-gnueabihf.2.17
+            release_target: armv7
+            zig: true
+          - runner: ubuntu-24.04
+            platform: openwrt
+            rust_target: x86_64-unknown-linux-musl
+            build_target: x86_64-unknown-linux-musl
+            release_target: amd64
+            zig: true
+          - runner: ubuntu-24.04
+            platform: openwrt
+            rust_target: aarch64-unknown-linux-musl
+            build_target: aarch64-unknown-linux-musl
+            release_target: arm64
+            zig: true
+          - runner: ubuntu-24.04
+            platform: openwrt
+            rust_target: armv7-unknown-linux-musleabihf
+            build_target: armv7-unknown-linux-musleabihf
+            release_target: armv7
+            zig: true
+          - runner: macos-15-intel
+            platform: macos
+            rust_target: x86_64-apple-darwin
+            build_target: x86_64-apple-darwin
+            release_target: amd64
+            zig: false
+          - runner: macos-15
+            platform: macos
+            rust_target: aarch64-apple-darwin
+            build_target: aarch64-apple-darwin
+            release_target: arm64
+            zig: false
+          - runner: windows-2025
+            platform: windows
+            rust_target: x86_64-pc-windows-msvc
+            build_target: x86_64-pc-windows-msvc
+            release_target: amd64
+            zig: false
+          - runner: windows-2025
+            platform: windows
+            rust_target: aarch64-pc-windows-msvc
+            build_target: aarch64-pc-windows-msvc
+            release_target: arm64
+            zig: false
+    steps:
+      - name: Check out public builder
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          path: builder
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Set up Zig
+        if: matrix.zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
+        with:
+          version: 0.15.2
+
+      - name: Install cargo-zigbuild
+        if: matrix.zig
+        shell: bash
+        run: cargo install cargo-zigbuild --version 0.23.0 --locked
+
+      - name: Check out private source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: fireunix-app/shadow-stunnix
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.SOURCE_REPO_PAT }}
+          persist-credentials: false
+          path: source
+
+      - name: Restore public dependency cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            .cargo-home/registry
+            .cargo-home/git
+          key: stunnix-${{ runner.os }}-${{ matrix.rust_target }}-${{ hashFiles('source/Cargo.lock') }}
+          restore-keys: |
+            stunnix-${{ runner.os }}-${{ matrix.rust_target }}-
+
+      - name: Build and package Unix release
+        if: matrix.platform != 'windows'
+        shell: bash
+        env:
+          BUILD_TARGET: ${{ matrix.build_target }}
+          PLATFORM: ${{ matrix.platform }}
+          RELEASE_TARGET: ${{ matrix.release_target }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+          USE_ZIG: ${{ matrix.zig }}
+          VERSION_NUMBER: ${{ needs.prepare.outputs.number }}
+          MACOSX_DEPLOYMENT_TARGET: "11.0"
+        run: |
+          set -euo pipefail
+          cd source
+          if [[ "${USE_ZIG}" == "true" ]]; then
+            RUSTFLAGS="-C strip=symbols" cargo zigbuild \
+              --release --locked --target "${BUILD_TARGET}"
+          else
+            RUSTFLAGS="-C strip=symbols" cargo build \
+              --release --locked --target "${BUILD_TARGET}" --bin STunnix
+          fi
+
+          archive="stunnix-${VERSION_NUMBER}-${PLATFORM}-${RELEASE_TARGET}"
+          package_dir="../dist/${archive}"
+          mkdir -p "${package_dir}/conf"
+          install -m 0755 "target/${RUST_TARGET}/release/STunnix" "${package_dir}/STunnix"
+          install -m 0644 conf/dev.toml "${package_dir}/conf/example.toml"
+          install -m 0644 ../builder/README.md "${package_dir}/README.md"
+          if [[ "${PLATFORM}" == "linux" ]]; then
+            mkdir -p "${package_dir}/scripts"
+            install -m 0644 deploy/stunnix.service "${package_dir}/stunnix.service"
+            install -m 0755 scripts/linux-network-tuning.sh "${package_dir}/scripts/linux-network-tuning.sh"
+          fi
+          tar -C ../dist -czf "../dist/${archive}.tar.gz" "${archive}"
+
+      - name: Build Windows release
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          RUST_TARGET: ${{ matrix.rust_target }}
+        working-directory: source
+        run: cargo build --release --locked --target $env:RUST_TARGET --bin STunnix
+
+      - name: Package Windows release
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        env:
+          RELEASE_TARGET: ${{ matrix.release_target }}
+          RUST_TARGET: ${{ matrix.rust_target }}
+          VERSION_NUMBER: ${{ needs.prepare.outputs.number }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $archive = "stunnix-$env:VERSION_NUMBER-windows-$env:RELEASE_TARGET"
+          $packageDir = "dist/$archive"
+          New-Item -ItemType Directory -Force "$packageDir/conf" | Out-Null
+          Copy-Item "source/target/$env:RUST_TARGET/release/STunnix.exe" "$packageDir/STunnix.exe"
+          Copy-Item "source/conf/dev.toml" "$packageDir/conf/example.toml"
+          Copy-Item "builder/README.md" "$packageDir/README.md"
+          Compress-Archive -Path $packageDir -DestinationPath "dist/$archive.zip" -Force
+
+      - name: Remove private source
+        if: always()
+        shell: bash
+        run: rm -rf source
+
+      - name: Store release artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stunnix-${{ matrix.platform }}-${{ matrix.release_target }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  build-bsd:
+    name: Build ${{ matrix.platform }} ${{ matrix.release_target }}
+    needs: prepare
+    runs-on: ubuntu-24.04
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: freebsd
+            vm_arch: x86_64
+            release_target: amd64
+          - platform: freebsd
+            vm_arch: aarch64
+            release_target: arm64
+          - platform: openbsd
+            vm_arch: x86_64
+            release_target: amd64
+          - platform: openbsd
+            vm_arch: aarch64
+            release_target: arm64
+    env:
+      CARGO_BUILD_JOBS: "4"
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "32"
+      CARGO_PROFILE_RELEASE_LTO: "false"
+      CARGO_PROFILE_RELEASE_OPT_LEVEL: "2"
+      PLATFORM: ${{ matrix.platform }}
+      RELEASE_TARGET: ${{ matrix.release_target }}
+      VERSION_NUMBER: ${{ needs.prepare.outputs.number }}
+    steps:
+      - name: Check out public builder
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          path: builder
+
+      - name: Check out private source
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: fireunix-app/shadow-stunnix
+          ref: ${{ inputs.source_ref }}
+          token: ${{ secrets.SOURCE_REPO_PAT }}
+          persist-credentials: false
+          path: source
+
+      - name: Restore public dependency cache
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            .cargo-home/registry
+            .cargo-home/git
+          key: stunnix-${{ matrix.platform }}-${{ matrix.release_target }}-${{ hashFiles('source/Cargo.lock') }}
+          restore-keys: |
+            stunnix-${{ matrix.platform }}-${{ matrix.release_target }}-
+
+      - name: Build and package in FreeBSD
+        if: matrix.platform == 'freebsd'
+        uses: vmactions/freebsd-vm@77ed28d336d03fe19a3f4f7266c1d2c4714dd79d # v1
+        with:
+          release: "14.4"
+          arch: ${{ matrix.vm_arch }}
+          cpu: 4
+          mem: 12288
+          usesh: true
+          sync: rsync
+          envs: >-
+            CARGO_HOME CARGO_INCREMENTAL CARGO_BUILD_JOBS
+            CARGO_PROFILE_RELEASE_CODEGEN_UNITS CARGO_PROFILE_RELEASE_LTO
+            CARGO_PROFILE_RELEASE_OPT_LEVEL PLATFORM RELEASE_TARGET VERSION_NUMBER
+          prepare: |
+            env ASSUME_ALWAYS_YES=yes pkg bootstrap -f
+            env ASSUME_ALWAYS_YES=yes pkg install rust cmake perl5 pkgconf
+          run: |
+            set -eu
+            cd source
+            archive="stunnix-${VERSION_NUMBER}-${PLATFORM}-${RELEASE_TARGET}"
+            package_dir="../dist/${archive}"
+            RUSTFLAGS="-C strip=symbols" cargo build --release --locked --bin STunnix
+            mkdir -p "${package_dir}/conf"
+            install -m 0755 target/release/STunnix "${package_dir}/STunnix"
+            install -m 0644 conf/dev.toml "${package_dir}/conf/example.toml"
+            install -m 0644 ../builder/README.md "${package_dir}/README.md"
+            tar -C ../dist -czf "../dist/${archive}.tar.gz" "${archive}"
+
+      - name: Build and package in OpenBSD
+        if: matrix.platform == 'openbsd'
+        uses: vmactions/openbsd-vm@c941015845c0f0c429676840963dc63b226d4f69 # v1.4.5
+        with:
+          release: "7.9"
+          arch: ${{ matrix.vm_arch }}
+          cpu: 4
+          mem: 12288
+          usesh: true
+          sync: rsync
+          envs: >-
+            CARGO_HOME CARGO_INCREMENTAL CARGO_BUILD_JOBS
+            CARGO_PROFILE_RELEASE_CODEGEN_UNITS CARGO_PROFILE_RELEASE_LTO
+            CARGO_PROFILE_RELEASE_OPT_LEVEL PLATFORM RELEASE_TARGET VERSION_NUMBER
+          prepare: pkg_add rust cmake gmake llvm pkgconf
+          run: |
+            set -eu
+            cd source
+            archive="stunnix-${VERSION_NUMBER}-${PLATFORM}-${RELEASE_TARGET}"
+            package_dir="../dist/${archive}"
+            RUSTFLAGS="-C strip=symbols" cargo build --release --locked --bin STunnix
+            mkdir -p "${package_dir}/conf"
+            install -m 0755 target/release/STunnix "${package_dir}/STunnix"
+            install -m 0644 conf/dev.toml "${package_dir}/conf/example.toml"
+            install -m 0644 ../builder/README.md "${package_dir}/README.md"
+            tar -C ../dist -czf "../dist/${archive}.tar.gz" "${archive}"
+
+      - name: Remove private source
+        if: always()
+        shell: bash
+        run: rm -rf source
+
+      - name: Store release artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: stunnix-${{ matrix.platform }}-${{ matrix.release_target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish release
+    if: inputs.publish
+    needs:
+      - prepare
+      - test
+      - build-portable
+      - build-bsd
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: stunnix-*
+          path: dist
+          merge-multiple: true
+
+      - name: Generate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          assets=(dist/*.tar.gz dist/*.zip dist/SHA256SUMS)
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
+            exit 0
+          fi
+
+          gh release create "${RELEASE_TAG}" \
+            "${assets[@]}" \
+            --target "${GITHUB_SHA}" \
+            --title "STunnix ${RELEASE_TAG}" \
+            --notes "Multi-platform binaries built from the configured private source ref."
