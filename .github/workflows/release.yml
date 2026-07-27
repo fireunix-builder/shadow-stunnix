@@ -583,9 +583,16 @@ jobs:
             exit 0
           fi
 
+          source_sha="$(gh api "repos/${TARGET_REPOSITORY}/commits/${SOURCE_REF}" --jq '.sha')"
+          echo "::add-mask::${source_sha}"
+          if ! gh api "repos/${TARGET_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh api --method POST "repos/${TARGET_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/${RELEASE_TAG}" \
+              -f sha="${source_sha}" >/dev/null
+          fi
           gh release create "${RELEASE_TAG}" \
             "${assets[@]}" \
             --repo "${TARGET_REPOSITORY}" \
-            --target "${SOURCE_REF}" \
+            --verify-tag \
             --title "STunnix ${RELEASE_TAG}" \
             --notes "Multi-platform binaries built from the configured private source ref."
