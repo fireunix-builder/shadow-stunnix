@@ -427,6 +427,92 @@ jobs:
           cd dist
           sha256sum ./*.tar.gz ./*.zip > SHA256SUMS
 
+      - name: Install release tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v jq >/dev/null
+          command -v gh >/dev/null
+          if ! command -v aws >/dev/null 2>&1; then
+            curl -fsSLo /tmp/awscliv2.zip https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip
+            unzip -q /tmp/awscliv2.zip -d /tmp
+            sudo /tmp/aws/install
+          fi
+
+      - name: Upload release artifacts to Cloudflare R2
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          AWS_EC2_METADATA_DISABLED: "true"
+          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_PUBLIC_URL: ${{ secrets.R2_PUBLIC_URL }}
+          RELEASE_TAG: ${{ inputs.version }}
+          VERSION_NUMBER: ${{ needs.prepare.outputs.number }}
+        run: |
+          set -euo pipefail
+          : "${AWS_ACCESS_KEY_ID:?R2_ACCESS_KEY_ID is not configured}"
+          : "${AWS_SECRET_ACCESS_KEY:?R2_SECRET_ACCESS_KEY is not configured}"
+          : "${R2_ACCOUNT_ID:?R2_ACCOUNT_ID is not configured}"
+          : "${R2_BUCKET:?R2_BUCKET is not configured}"
+          : "${R2_PUBLIC_URL:?R2_PUBLIC_URL is not configured}"
+
+          endpoint="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          prefix="STunnix/${RELEASE_TAG}"
+          public_url="${R2_PUBLIC_URL%/}"
+
+          aws s3 sync dist "s3://${R2_BUCKET}/${prefix}/" \
+            --endpoint-url "${endpoint}" \
+            --exclude "*" \
+            --include "*.tar.gz" \
+            --include "*.zip" \
+            --include "SHA256SUMS" \
+            --cache-control "public,max-age=31536000,immutable" \
+            --only-show-errors
+
+          files_json="$(
+            for asset in dist/*.tar.gz dist/*.zip; do
+              test -e "${asset}" || continue
+              file="$(basename "${asset}")"
+              key="${file#stunnix-${VERSION_NUMBER}-}"
+              key="${key%.tar.gz}"
+              key="${key%.zip}"
+              sha="$(awk -v name="./${file}" '$2 == name { print $1 }' dist/SHA256SUMS)"
+              test -n "${sha}"
+              jq -n \
+                --arg key "${key}" \
+                --arg url "${public_url}/${prefix}/${file}" \
+                --arg sha256 "${sha}" \
+                '{key: $key, value: {url: $url, sha256: $sha256}}'
+            done | jq -s 'from_entries'
+          )"
+          files_json="$(
+            jq \
+              '. + {amd64: .["linux-amd64"], arm64: .["linux-arm64"]}' \
+              <<< "${files_json}"
+          )"
+          jq -e '.amd64 and .arm64' <<< "${files_json}" >/dev/null
+
+          jq -n \
+            --arg version "${RELEASE_TAG}" \
+            --arg released_at "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
+            --arg checksums_url "${public_url}/${prefix}/SHA256SUMS" \
+            --argjson files "${files_json}" \
+            '{
+              version: $version,
+              released_at: $released_at,
+              files: $files,
+              checksums_url: $checksums_url
+            }' > dist/latest.json
+
+          aws s3 cp dist/latest.json "s3://${R2_BUCKET}/STunnix/latest.json" \
+            --endpoint-url "${endpoint}" \
+            --content-type "application/json" \
+            --cache-control "no-cache,max-age=0" \
+            --only-show-errors
+
       - name: Publish GitHub Release
         shell: bash
         env:
