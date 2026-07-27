@@ -9,3 +9,6 @@ excluded from repository content, workflow artifacts, and caches. Release
 archives contain compiled binaries and explicitly published runtime templates
 only.
 
+GitHub Releases are written back to the private STunnix repository through a
+separate single-repository write token. This public repository never hosts
+Releases; R2 receives only the reviewed binary archives and checksums.
