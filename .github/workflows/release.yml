@@ -568,13 +568,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_REPO_PAT }}
           RELEASE_TAG: ${{ inputs.version }}
-          SOURCE_REF: ${{ inputs.source_ref }}
           TARGET_REPOSITORY: fireunix-app/shadow-stunnix
         run: |
           set -euo pipefail
           : "${GH_TOKEN:?RELEASE_REPO_PAT is not configured}"
           [[ "${TARGET_REPOSITORY}" == fireunix-app/* ]]
           [[ "$(gh api "repos/${TARGET_REPOSITORY}" --jq '.private')" == "true" ]]
+          if ! gh api "repos/${TARGET_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "::error::Release tag must already exist in the private source repository."
+            exit 1
+          fi
           assets=(dist/*.tar.gz dist/*.zip dist/SHA256SUMS)
           if gh release view "${RELEASE_TAG}" --repo "${TARGET_REPOSITORY}" >/dev/null 2>&1; then
             gh release upload "${RELEASE_TAG}" "${assets[@]}" \
@@ -583,13 +586,6 @@ jobs:
             exit 0
           fi
 
-          source_sha="$(gh api "repos/${TARGET_REPOSITORY}/commits/${SOURCE_REF}" --jq '.sha')"
-          echo "::add-mask::${source_sha}"
-          if ! gh api "repos/${TARGET_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
-            gh api --method POST "repos/${TARGET_REPOSITORY}/git/refs" \
-              -f ref="refs/tags/${RELEASE_TAG}" \
-              -f sha="${source_sha}" >/dev/null
-          fi
           gh release create "${RELEASE_TAG}" \
             "${assets[@]}" \
             --repo "${TARGET_REPOSITORY}" \

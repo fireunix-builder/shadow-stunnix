@@ -12,3 +12,4 @@ only.
 GitHub Releases are written back to the private STunnix repository through a
 separate single-repository write token. This public repository never hosts
 Releases; R2 receives only the reviewed binary archives and checksums.
+The requested release tag must already exist in the private source repository.
