@@ -118,6 +118,7 @@ jobs:
           key: stunnix-cargo-v2-${{ runner.os }}-${{ hashFiles('source/Cargo.lock') }}
           restore-keys: |
             stunnix-cargo-v2-${{ runner.os }}-
+            stunnix-${{ runner.os }}-x86_64-unknown-linux-gnu-
 
       - name: Test private source
         working-directory: source
@@ -249,6 +250,7 @@ jobs:
           key: stunnix-cargo-v2-${{ runner.os }}-${{ hashFiles('source/Cargo.lock') }}
           restore-keys: |
             stunnix-cargo-v2-${{ runner.os }}-
+            stunnix-${{ runner.os }}-${{ matrix.rust_target }}-
 
       - name: Restore cargo-zigbuild cache
         if: matrix.zig
@@ -442,6 +444,7 @@ jobs:
           key: stunnix-cargo-v2-${{ matrix.platform }}-${{ hashFiles('source/Cargo.lock') }}
           restore-keys: |
             stunnix-cargo-v2-${{ matrix.platform }}-
+            stunnix-${{ matrix.platform }}-${{ matrix.release_target }}-
 
       - name: Restore compiled dependency cache
         if: matrix.compiled_cache
@@ -587,6 +590,7 @@ jobs:
           key: stunnix-cargo-v2-openbsd-${{ hashFiles('source/Cargo.lock') }}
           restore-keys: |
             stunnix-cargo-v2-openbsd-
+            stunnix-openbsd-arm64-
 
       - name: Restore compiled dependency checkpoint
         id: compiled-cache
@@ -711,6 +715,7 @@ jobs:
           key: stunnix-cargo-v2-openbsd-${{ hashFiles('source/Cargo.lock') }}
           restore-keys: |
             stunnix-cargo-v2-openbsd-
+            stunnix-openbsd-arm64-
 
       - name: Restore compiled dependency checkpoint
         id: compiled-cache
@@ -838,6 +843,7 @@ jobs:
           key: stunnix-cargo-v2-openbsd-${{ hashFiles('source/Cargo.lock') }}
           restore-keys: |
             stunnix-cargo-v2-openbsd-
+            stunnix-openbsd-arm64-
 
       - name: Restore compiled dependency checkpoint
         id: compiled-cache
