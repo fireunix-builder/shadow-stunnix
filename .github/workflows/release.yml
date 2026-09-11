@@ -36,32 +36,21 @@ jobs:
     outputs:
       number: ${{ steps.version.outputs.number }}
     steps:
-      - name: Verify private source access
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.SOURCE_REPO_PAT }}
-        run: |
-          set -euo pipefail
-          if ! gh api --silent repos/fireunix-app/shadow-stunnix/contents/Cargo.toml; then
-            echo "::error::SOURCE_REPO_PAT cannot read the private source. Check token expiry, repository selection, and Contents read permission."
-            exit 1
-          fi
-
       - name: Check out private source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           repository: fireunix-app/shadow-stunnix
           ref: ${{ inputs.source_ref }}
-          token: ${{ secrets.SOURCE_REPO_PAT }}
+          ssh-key: ${{ secrets.SOURCE_DEPLOY_KEY }}
           persist-credentials: false
           path: source
+          fetch-depth: 0
 
       - name: Validate release version
         id: version
         shell: bash
         env:
           RELEASE_TAG: ${{ inputs.version }}
-          SOURCE_REPO_PAT: ${{ secrets.SOURCE_REPO_PAT }}
         run: |
           set -euo pipefail
           if [[ ! "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
@@ -74,13 +63,7 @@ jobs:
             exit 1
           fi
           source_sha="$(git -C source rev-parse HEAD)"
-          tag_object="$(GH_TOKEN="${SOURCE_REPO_PAT}" gh api \
-            "repos/fireunix-app/shadow-stunnix/git/ref/tags/${RELEASE_TAG}")"
-          tag_sha="$(jq -r '.object.sha' <<<"${tag_object}")"
-          if [[ "$(jq -r '.object.type' <<<"${tag_object}")" == "tag" ]]; then
-            tag_sha="$(GH_TOKEN="${SOURCE_REPO_PAT}" gh api \
-              "repos/fireunix-app/shadow-stunnix/git/tags/${tag_sha}" --jq '.object.sha')"
-          fi
+          tag_sha="$(git -C source rev-parse --verify "refs/tags/${RELEASE_TAG}^{commit}")"
           if [[ "${source_sha}" != "${tag_sha}" ]]; then
             echo "::error::Release tag does not match the private source revision."
             exit 1
@@ -116,7 +99,7 @@ jobs:
         with:
           repository: fireunix-app/shadow-stunnix
           ref: ${{ inputs.source_ref }}
-          token: ${{ secrets.SOURCE_REPO_PAT }}
+          ssh-key: ${{ secrets.SOURCE_DEPLOY_KEY }}
           persist-credentials: false
           path: source
 
@@ -248,7 +231,7 @@ jobs:
         with:
           repository: fireunix-app/shadow-stunnix
           ref: ${{ inputs.source_ref }}
-          token: ${{ secrets.SOURCE_REPO_PAT }}
+          ssh-key: ${{ secrets.SOURCE_DEPLOY_KEY }}
           persist-credentials: false
           path: source
 
@@ -444,7 +427,7 @@ jobs:
         with:
           repository: fireunix-app/shadow-stunnix
           ref: ${{ inputs.source_ref }}
-          token: ${{ secrets.SOURCE_REPO_PAT }}
+          ssh-key: ${{ secrets.SOURCE_DEPLOY_KEY }}
           persist-credentials: false
           path: source
 
@@ -590,7 +573,7 @@ jobs:
         with:
           repository: fireunix-app/shadow-stunnix
           ref: ${{ inputs.source_ref }}
-          token: ${{ secrets.SOURCE_REPO_PAT }}
+          ssh-key: ${{ secrets.SOURCE_DEPLOY_KEY }}
           persist-credentials: false
           path: source
 
@@ -715,7 +698,7 @@ jobs:
         with:
           repository: fireunix-app/shadow-stunnix
           ref: ${{ inputs.source_ref }}
-          token: ${{ secrets.SOURCE_REPO_PAT }}
+          ssh-key: ${{ secrets.SOURCE_DEPLOY_KEY }}
           persist-credentials: false
           path: source
 
@@ -843,7 +826,7 @@ jobs:
         with:
           repository: fireunix-app/shadow-stunnix
           ref: ${{ inputs.source_ref }}
-          token: ${{ secrets.SOURCE_REPO_PAT }}
+          ssh-key: ${{ secrets.SOURCE_DEPLOY_KEY }}
           persist-credentials: false
           path: source
 
