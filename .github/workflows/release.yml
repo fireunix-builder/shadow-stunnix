@@ -36,6 +36,17 @@ jobs:
     outputs:
       number: ${{ steps.version.outputs.number }}
     steps:
+      - name: Verify private source access
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.SOURCE_shadow-stunnix_PAT }}
+        run: |
+          set -euo pipefail
+          if ! gh api --silent repos/fireunix-app/shadow-stunnix/contents/Cargo.toml; then
+            echo "::error::SOURCE_shadow-stunnix_PAT cannot read the private source. Check token expiry, repository selection, and Contents read permission."
+            exit 1
+          fi
+
       - name: Check out private source
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
