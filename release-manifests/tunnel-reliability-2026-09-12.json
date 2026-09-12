@@ -1,0 +1,55 @@
+[
+  {
+    "repository": "fireunix-builder/shadow-control",
+    "service": "Control",
+    "version": "v0.1.1",
+    "run_id": 34631731980,
+    "files": {
+      "shadow-control-0.1.1-linux-amd64.tar.gz": "ae0d9b9ba4b6f294d6bf5de652415f5200a077a87ac8217b1e44f834ae5dd174"
+    }
+  },
+  {
+    "repository": "fireunix-builder/shadow-stunnix",
+    "service": "STunnix",
+    "version": "v0.1.2",
+    "run_id": 34631735329,
+    "files": {
+      "stunnix-0.1.2-freebsd-amd64.tar.gz": "81473eff5ab2ed3a9d2ba4bc962479622a09a14940cfd7b9679b0e3524fcf5f5",
+      "stunnix-0.1.2-freebsd-arm64.tar.gz": "28976486ed00c33f73307c2e8e0676f9964a84d6108100dc2af34e222311ba0e",
+      "stunnix-0.1.2-linux-amd64.tar.gz": "74d55a7ac2f18ac0ecc3d73131b730cd43fdf8b44c6da5cf6661403f5d963899",
+      "stunnix-0.1.2-linux-arm64.tar.gz": "ba547dabf777f39a84ba1b2735e6fceddecb86e9cd612c4c79dc66df93dc92c6",
+      "stunnix-0.1.2-linux-armv7.tar.gz": "5fee170387f16c577bd23cb1b4331d596d382a57e81fcbfb45f3a190af696e92",
+      "stunnix-0.1.2-macos-amd64.tar.gz": "bd92c05afd8be202e7ebb60d8973e22686d742b1b05356b0a9e7228ab8c5c01b",
+      "stunnix-0.1.2-macos-arm64.tar.gz": "412b09a4acbf7ad010fd24678d9e5879c2ace5e5242e968e41ba59e4480e1b78",
+      "stunnix-0.1.2-openbsd-amd64.tar.gz": "b25d06a7aedd7ac5374946f23c67ba58265889250d2871c2c2ca5f85c425a890",
+      "stunnix-0.1.2-openbsd-arm64.tar.gz": "31f8906862c8d3760546883ece23501b918907764aec347435673080c3b6fa12",
+      "stunnix-0.1.2-openwrt-amd64.tar.gz": "d374aaf4d9802d45887160a6ec8cf19e74901e900c153c399e656755d437f002",
+      "stunnix-0.1.2-openwrt-arm64.tar.gz": "ac489ace9c5f1f207f6662f60cdc294e9298d131cb3107165baf5baf62b5405a",
+      "stunnix-0.1.2-openwrt-armv7.tar.gz": "f7b634fa8651202c8606e796af72309066681faebc8ede705f12e2701f2f9c84",
+      "stunnix-0.1.2-windows-amd64.zip": "07416a5737421dfb323f666232567bedca83a263932ba2f6e44a35f625b335a3",
+      "stunnix-0.1.2-windows-arm64.zip": "8f86541821bafec1993fd022f589bb057c9be466defac7d2f604d7619dc01674"
+    }
+  },
+  {
+    "repository": "fireunix-builder/shadow-ctunnix",
+    "service": "CTunnix",
+    "version": "v0.1.1",
+    "run_id": 34631739298,
+    "files": {
+      "ctunnix-0.1.1-freebsd-amd64.tar.gz": "111a61dfd315ad49e40d6f4b858d1f542144fb7f0dd8a0a9e347c49d6e72404c",
+      "ctunnix-0.1.1-freebsd-arm64.tar.gz": "29b515f330876af58dd49e973c856598650173133cfab365d50ddef4ab48f510",
+      "ctunnix-0.1.1-linux-amd64.tar.gz": "b6a1bf9d46020fbee4ef419b51e4f2c091ca281d9fa94b5a4799eea9de1a37c9",
+      "ctunnix-0.1.1-linux-arm64.tar.gz": "8277e0cd867dbe0f0cd7ef160b9f1dd39efa4287579f967272d007c254418c59",
+      "ctunnix-0.1.1-linux-armv7.tar.gz": "45177b72c9e2c63b2a2901673db5cd295426eeea0e1cce8f0b78694afbcb0f84",
+      "ctunnix-0.1.1-macos-amd64.tar.gz": "b8304facf7828281e25e0abf8a7c08e19686242dc3a7bb16a4b1c8130b3f09cf",
+      "ctunnix-0.1.1-macos-arm64.tar.gz": "96ec46029fc14f6ed5a1631d36d2e7a49b154190c5cbde3be069e152f29c12d2",
+      "ctunnix-0.1.1-openbsd-amd64.tar.gz": "790e90256c61b0aa85ae069454d0fb6e568b884dbba5b78457501cc9cfea66a2",
+      "ctunnix-0.1.1-openbsd-arm64.tar.gz": "ced9611890ac6006b6cd04195b8838b2b254468ba8a6d99871210f0ea1f315b5",
+      "ctunnix-0.1.1-openwrt-amd64.tar.gz": "abdaab3148af07a717e720a45881445dd13daaee2b7ae9ae2cddacf3e2e1c9c8",
+      "ctunnix-0.1.1-openwrt-arm64.tar.gz": "7a98d2f75435b9e2d40aba4d969c74566ae310c0e0b29c5c2f08972b50055a54",
+      "ctunnix-0.1.1-openwrt-armv7.tar.gz": "ba8d5a1378cc55e2331fbc260e6da555ee9ee8874a1cbc33000db542411dd1d1",
+      "ctunnix-0.1.1-windows-amd64.zip": "570b65b8a78722338f75eab71762baf02f2a4287df4a97bf2507678de683aecc",
+      "ctunnix-0.1.1-windows-arm64.zip": "5a38dc3bbdab6333bcf0617f46e885ca2d92cd44c6de93607fe4a25eb3456418"
+    }
+  }
+]
