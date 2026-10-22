@@ -9,9 +9,10 @@ excluded from repository content, workflow artifacts, and caches. Release
 archives contain compiled binaries and explicitly published runtime templates
 only.
 
-GitHub Releases are written back to the private STunnix repository through a
-separate single-repository write token. This public repository never hosts
+GitHub Releases are written back to the private STunnix repository with a short-lived installation token of the
+`fireunix-publisher` GitHub App (`RELEASE_APP_CLIENT_ID` /
+`RELEASE_APP_PRIVATE_KEY` secrets), scoped to that one repository. This public repository never hosts
 Releases; R2 receives only the reviewed binary archives and checksums.
 The requested release tag must already exist in the private source repository.
 
-Private source checkouts use `SOURCE_DEPLOY_KEY` Actions secrets. Each public key is registered with read-only access on its corresponding private repository. Release identity is checked against the fetched Git tag; source read access does not require a personal token. Publishing still uses the existing, separate `RELEASE_REPO_PAT`.
+Private source checkouts use `SOURCE_DEPLOY_KEY` Actions secrets. Each public key is registered with read-only access on its corresponding private repository. Release identity is checked against the fetched Git tag; source read access does not require a personal token.

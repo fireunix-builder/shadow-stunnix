@@ -495,15 +495,27 @@ jobs:
             --cache-control "no-cache,max-age=0" \
             --only-show-errors
 
+      # A short-lived installation token of the fireunix-publisher GitHub App,
+      # scoped to the private repository the release is created in.
+      - name: Create release token
+        id: release-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          owner: fireunix-app
+          repositories: shadow-stunnix
+          permission-contents: write
+
       - name: Publish GitHub Release
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.RELEASE_REPO_PAT }}
+          GH_TOKEN: ${{ steps.release-token.outputs.token }}
           RELEASE_TAG: ${{ inputs.version }}
           TARGET_REPOSITORY: fireunix-app/shadow-stunnix
         run: |
           set -euo pipefail
-          : "${GH_TOKEN:?RELEASE_REPO_PAT is not configured}"
+          : "${GH_TOKEN:?release token was not created}"
           [[ "${TARGET_REPOSITORY}" == fireunix-app/* ]]
           [[ "$(gh api "repos/${TARGET_REPOSITORY}" --jq '.private')" == "true" ]]
           if ! gh api "repos/${TARGET_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
